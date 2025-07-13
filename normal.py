@@ -20,9 +20,7 @@ def train(model, cfg: TrainingConfig, dataset: datasets.Dataset):
 
     model.train()
 
-    wandb.init(project="thoughtful", name="gpt2s_normal", config=cfg)
-    wandb.watch(model, log="all")
-    wandb.config.update(model.cfg.to_dict())
+    wandb.init(project="recycler", name="normal", config=cfg)
     wandb.config.update(cfg.to_dict())
 
     sample_completion = completion(model, "George Washington was")
