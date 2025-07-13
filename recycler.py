@@ -70,7 +70,7 @@ def train(model: Recycler, cfg: TrainingConfig, dataset: datasets.Dataset):
             table = wandb.Table(data=table_data, columns=['completion'])
             wandb.log({"sample_completion": table})
 
-            t.save(model.state_dict(), f"saves/normal{i}.pth")
+            t.save(model.state_dict(), f"saves/recycler{i}.pth")
 
 if __name__ == "__main__":
     t.set_default_device(t.device("cuda"))

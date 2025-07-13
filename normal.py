@@ -33,8 +33,8 @@ def train(model, cfg: TrainingConfig, dataset: datasets.Dataset):
     for i, batch in enumerate((tr:=tqdm.tqdm(dl, ncols=100))):
         tokens = batch['input_ids']
         logits = model(tokens)
-        logprobs = t.log_softmax(logits[:, :-1], dim=-1)
-        loss = -eindex.eindex(logprobs, tokens[:, 1:], "batch seq [batch seq]").mean()
+        logprobs = t.log_softmax(logits, dim=-1)
+        loss = -eindex.eindex(logprobs[:, :-1], tokens[:, 1:], "batch seq [batch seq]").mean()
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
