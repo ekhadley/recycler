@@ -42,19 +42,18 @@ def train(model: Recycler, cfg: TrainingConfig, dataset: datasets.Dataset):
     dl = t.utils.data.DataLoader(dataset, batch_size=cfg.batch_size)
     for i, batch in enumerate((tr:=tqdm.tqdm(dl, ncols=100))):
         tokens = batch['input_ids']
-        print()
-        print(red, tokens.shape, endc)
 
         ctx = t.zeros((batch_size, seq_len, d_model)) # preaallocate context instead of cating
         logits = t.zeros((batch_size, seq_len, d_vocab)) # preaallocate context instead of cating
-        new_ctx, new_logits = model.forward(tokens[:, 0].reshape(-1, 1)) # get initial context by feeding  first token
         for s in range(model.cfg.seq_len):
             toks = tokens[:, s].reshape(-1, 1) # (batch, 1)
-            new_ctx, new_logits = model.forward(toks, None if s == 0 else ctx[:, :s]) # process the next token with the current context
+            new_ctx, new_logits = model.forward(toks, ctx[:, :s] if s != 0 else None) # process the next token with the current context
             ctx[:, s, :] = new_ctx # update the context with the new context vector
             logits[:, s, :] = new_logits
        
-        #print(purple, ctx.shape, lime, new_ctx.shape, green, logits.shape, endc)
+        print()
+        print(red, tokens.shape, endc)
+        print(purple, ctx.shape, lime, new_ctx.shape, green, logits.shape, endc)
         logprobs = t.log_softmax(logits, dim=-1)
         loss = -eindex.eindex(logprobs[:, :-1], tokens[:, 1:], "batch seq [batch seq]").sum()
 
