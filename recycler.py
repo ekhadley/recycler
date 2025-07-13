@@ -48,21 +48,18 @@ def train(model: Recycler, cfg: TrainingConfig, dataset: datasets.Dataset):
         ctx = t.zeros((batch_size, seq_len, d_model)) # preaallocate context instead of cating
         logits = t.zeros((batch_size, seq_len, d_vocab)) # preaallocate context instead of cating
         new_ctx, new_logits = model.forward(tokens[:, 0].reshape(-1, 1)) # get initial context by feeding  first token
-        ctx[:, 0, :] = new_ctx
-        logits[:, 0, :] = new_logits
-        for s in range(1, model.cfg.seq_len):
+        for s in range(model.cfg.seq_len):
             toks = tokens[:, s].reshape(-1, 1) # (batch, 1)
-            new_ctx, new_logits = model.forward(toks, ctx[:, :s]) # process the next token with the current context
+            new_ctx, new_logits = model.forward(toks, None if s == 0 else ctx[:, :s]) # process the next token with the current context
             ctx[:, s, :] = new_ctx # update the context with the new context vector
-            logits[:, s-1, :] = new_logits
+            logits[:, s, :] = new_logits
        
+        #print(purple, ctx.shape, lime, new_ctx.shape, green, logits.shape, endc)
         logprobs = t.log_softmax(logits, dim=-1)
         loss = -eindex.eindex(logprobs[:, :-1], tokens[:, 1:], "batch seq [batch seq]").sum()
 
         loss.backward()
         optimizer.step()
-        
-        exit()
 
         wandb.log({"loss": loss.item()})
         tr.set_description(f"{magenta}loss: {loss.item():.3f}")
@@ -81,8 +78,8 @@ if __name__ == "__main__":
     t.manual_seed(42)
     random.seed(42)
 
-    #model_cfg = RecycleModelConfig(d_model=32, seq_len=128, d_mlp=128, d_head=16, n_heads=2, n_layers=4, recycle_layer_pos=3, d_vocab=50257)
-    model_cfg = RecycleModelConfig(d_model=512, seq_len=256, d_mlp=2048, d_head=64, n_heads=8, n_layers=4, d_vocab=50257)
+    model_cfg = RecycleModelConfig(d_model=32, seq_len=128, d_mlp=128, d_head=16, n_heads=2, n_layers=4, recycle_layer_pos=3, d_vocab=50257)
+    #model_cfg = RecycleModelConfig(d_model=512, seq_len=256, d_mlp=2048, d_head=64, n_heads=8, n_layers=4, d_vocab=50257)
     model = Recycler(model_cfg)
     training_cfg = TrainingConfig(
         batch_size=64,
