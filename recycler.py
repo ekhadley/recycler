@@ -4,23 +4,24 @@ import tqdm
 import datasets
 
 from utils import *
-from models import GPT2, TrainingConfig, ModelConfig
+from models import Recycler, TrainingConfig, ModelConfig
 
-def completion(model: GPT2, prompt: str, max_length: int = 50) -> str:
+def completion(model: Recycler, prompt: str, max_length: int = 50) -> str:
     tokens = model.tokenizer(prompt, return_tensors='pt').input_ids.to(t.device("cuda"))
     with t.no_grad():
+        ctx = model.forward(tokens[:, 0], None, need_distn=False)  # Get initial context for the first token
         for _ in range(max_length):
-            logits = model(tokens)
-            next_token = sampleLogits(logits[:, -1, :], temperature=1.0).unsqueeze(1)
-            tokens = t.cat((tokens, next_token), dim=1)
-    return model.tokenizer.decode(tokens[0])
+            new_ctx, logits = model.forward(new_ctx, tokens[:, -1:]) # Process the next token with the current context
+            next_token = t.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+            ctx = t.cat((ctx, new_ctx.unsqueeze(1)), dim=1)  # Append the new context
+    return model.tokenizer.decode(tokens[0], skip_special_tokens=True)
 
 def train(model, cfg: TrainingConfig, dataset: datasets.Dataset):
     optimizer = t.optim.AdamW(model.parameters(), lr=cfg.lr, betas=(cfg.adam_beta1, cfg.adam_beta2), weight_decay=cfg.weight_decay)
 
     model.train()
 
-    wandb.init(project="thoughtful", name="gpt2s_normal", config=cfg)
+    wandb.init(project="recycler", name="recycler", config=cfg)
     wandb.watch(model, log="all")
     wandb.config.update(model.cfg.to_dict())
     wandb.config.update(cfg.to_dict())
@@ -58,9 +59,16 @@ if __name__ == "__main__":
     t.manual_seed(42)
     random.seed(42)
 
-    model_cfg = ModelConfig(d_model=512, seq_len=256, d_mlp=2048, d_head=64, n_heads=8, n_layers=8, d_vocab=50257)
-    #model_cfg = ModelConfig(d_model=32, seq_len=256, d_mlp=128, d_head=16, n_heads=4, n_layers=4, d_vocab=50257)
-    model = GPT2(model_cfg)
+    model_cfg = ModelConfig(
+        d_model=512,
+        seq_len=256,
+        d_mlp=2048,
+        d_head=64,
+        n_heads=8,
+        n_layers=8,
+        d_vocab=50257
+    )
+    model = Recycler(model_cfg)
     training_cfg = TrainingConfig(
         batch_size=64,
         lr=1e-3,

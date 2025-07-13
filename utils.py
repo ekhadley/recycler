@@ -53,7 +53,21 @@ def loadTokenizedDataset(name: str):
     dataset.set_format(type='torch')
     return dataset
 
-
+def sampleLogits(logits: t.Tensor, temperature: float = 1.0, top_k: int = 0, top_p: float = 1.0, ) -> t.Tensor:
+    logits = logits.squeeze() / temperature
+    if top_k > 0:
+        indices_to_remove = logits < t.topk(logits, top_k)[0][..., -1, None]
+        logits[indices_to_remove] = -float('Inf')
+    if 0 < top_p < 1:
+        sorted_logits, sorted_indices = t.sort(logits, descending=True)
+        cumulative_probs = t.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        sorted_indices_to_remove = cumulative_probs > top_p
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+        logits[indices_to_remove] = -float('Inf')
+    probs = F.softmax(logits, dim=-1)
+    return t.multinomial(probs, num_samples=1)
  
 def line(logits: t.Tensor) -> None:
     plot = plotly.graph_objects.Figure()
