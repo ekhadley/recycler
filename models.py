@@ -8,39 +8,6 @@ from transformers import GPT2TokenizerFast
 
 from utils import *
 
-@dataclass
-class ModelConfig:
-    d_model: int = 512
-    seq_len: int = 512
-    d_mlp: int = 2048
-    d_head: int = 64
-    n_heads: int = 8
-    n_layers: int = 6
-    d_vocab: int = 50257
-    seq_len: int = 512
-    
-    def to_dict(self):
-        return {field.name: getattr(self, field.name) for field in self.__dataclass_fields__.values()}
-
-@dataclass
-class RecycleModelConfig:
-    d_model: int = 512
-    seq_len: int = 512
-    d_mlp: int = 2048
-    d_head: int = 64
-    n_heads: int = 8
-    n_layers: int = 6
-    d_vocab: int = 50257
-    seq_len: int = 512
-
-    recycle_layer_pos: int = None
-
-    def __post_init__(self):
-        if self.recycle_layer_pos is None:
-            self.recycle_layer_pos = self.n_layers - 1
-    
-    def to_dict(self):
-        return {field.name: getattr(self, field.name) for field in self.__dataclass_fields__.values()}
 
 @dataclass
 class TrainingConfig:
@@ -64,6 +31,20 @@ class TrainingConfig:
     def to_dict(self):
         return {field.name: getattr(self, field.name) for field in self.__dataclass_fields__.values()}
 
+
+@dataclass
+class ModelConfig:
+    d_model: int = 512
+    seq_len: int = 512
+    d_mlp: int = 2048
+    d_head: int = 64
+    n_heads: int = 8
+    n_layers: int = 6
+    d_vocab: int = 50257
+    seq_len: int = 512
+    
+    def to_dict(self):
+        return {field.name: getattr(self, field.name) for field in self.__dataclass_fields__.values()}
 
 class TransformerBlock(nn.Module):
     def __init__(self, cfg: ModelConfig):
@@ -112,6 +93,25 @@ class GPT2(nn.Module):
         return x
 
 
+@dataclass
+class RecycleModelConfig:
+    d_model: int = 512
+    seq_len: int = 512
+    d_mlp: int = 2048
+    d_head: int = 64
+    n_heads: int = 8
+    n_layers: int = 6
+    d_vocab: int = 50257
+    seq_len: int = 512
+    recycle_layer: int = None
+
+    def __post_init__(self):
+        if self.recycle_layer is None:
+            self.recycle_layer = self.n_layers - 1
+    
+    def to_dict(self):
+        return {field.name: getattr(self, field.name) for field in self.__dataclass_fields__.values()}
+
 class Recycler(nn.Module):
     def __init__(self, cfg: ModelConfig):
         super(Recycler, self).__init__()
@@ -136,12 +136,12 @@ class Recycler(nn.Module):
             x = t.cat([context, token_embed], dim=1)  # Concatenate context with the new token embedding
         else:
             x = token_embed
-
         seq_len = x.shape[1]
+
         x += self.pos_embed(t.arange(seq_len, device=x.device)).unsqueeze(0) # Add positional embeddings
         for i, block in enumerate(self.blocks):
             x = block(x)
-            if i == self.cfg.recycle_layer_pos:
+            if i == self.cfg.recycle_layer:
                 new_context = x[:, -1, :]  # Store the context vector from the specified layer
                 if not need_distn: return new_context # if we don't need the distribution, return the context vector immediately
         x = self.ln_f(x[:, -1, :]) # Toss unecessary context.
@@ -151,7 +151,7 @@ class Recycler(nn.Module):
     # forward pass for a single string of tokens.
     # Has to sequentially process  each token to accumulate hidden state context.
     # Returns full context for the sequence.
-    def process_seq(self, tokens: Tensor) -> tuple[Tensor, Tensor]:
+    def process_seq(self, tokens: Tensor) -> Tensor:
         if tokens.ndim == 1: tokens = tokens.unsqueeze(0)  # Ensure tokens is 2D
         bsize = tokens.shape[0]
         seq_len = tokens.shape[1]
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         d_head=16,
         n_heads=4,
         n_layers=4,
-        recycle_layer_pos=3,
+        recycle_layer=3,
         d_vocab=50257
     )
     model = Recycler(model_cfg)
