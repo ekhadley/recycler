@@ -51,11 +51,11 @@ def train(model: Recycler, cfg: TrainingConfig, dataset: datasets.Dataset):
             ctx[:, s, :] = new_ctx # update the context with the new context vector
             logits[:, s, :] = new_logits
        
-        print()
-        print(red, tokens.shape, endc)
-        print(purple, ctx.shape, lime, new_ctx.shape, green, logits.shape, endc)
+        #print()
+        #print(red, tokens.shape, endc)
+        #print(purple, ctx.shape, lime, new_ctx.shape, green, logits.shape, endc)
         logprobs = t.log_softmax(logits, dim=-1)
-        loss = -eindex.eindex(logprobs[:, :-1], tokens[:, 1:], "batch seq [batch seq]").sum()
+        loss = -eindex.eindex(logprobs[:, :-1], tokens[:, 1:], "batch seq [batch seq]").mean()
 
         loss.backward()
         optimizer.step()
