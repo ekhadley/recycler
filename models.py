@@ -125,17 +125,23 @@ class Recycler(nn.Module):
         
     # forward passes like an rnn. Takes a continuous 2d context of previous text and a single new token, outputs the new context vector and a distn for next token prediction
     # the context vector is one of the later layer hidden states (residual stream vectors) for the last token position. Context is combined by simple concatenation.
-    def forward(self, token: Tensor, context: Tensor = None, need_distn: bool = True) -> tuple[Tensor, Tensor] | Tensor: 
+    def forward(self, token: Tensor = None, context: Tensor = None, need_distn: bool = True) -> tuple[Tensor, Tensor] | Tensor: 
+        assert token is not None or context is not None, "Either a first token or an context state must be provided"
         if token.ndim == 1: token = token.unsqueeze(0)
         assert token.ndim == 2, "Token should be single item or 1D tensor"
 
-        token_embed = self.embed(token)
-        if not context is None:
+        token_embed = self.embed(token) if token is not None else None
+        if context is not None:
             if context.ndim == 2: context = context.unsqueeze(0)  # Ensure context is 3D
             assert context.ndim == 3, "Context should be (batch, seq, d_model) or (seq, d_model)"
+
+        if context is not None and token_embed is not None:
             x = t.cat([context, token_embed], dim=1)  # Concatenate context with the new token embedding
-        else:
+        elif context is None:
             x = token_embed
+        else:
+            x = context
+
         seq_len = x.shape[1]
 
         x += self.pos_embed(t.arange(seq_len, device=x.device)).unsqueeze(0) # Add positional embeddings
@@ -156,14 +162,14 @@ class Recycler(nn.Module):
         bsize = tokens.shape[0]
         seq_len = tokens.shape[1]
         ctx = tokens.new_zeros((bsize, seq_len, self.cfg.d_model))
-        new_ctx = self.forward(tokens[:, 0], None, need_distn=False) # Get initial context for the first token
+        new_ctx = self.forward(token = tokens[:, 0], context = None, need_distn=False) # Get initial context for the first token
         for i in range(1, seq_len):
-            new_ctx = self.forward(tokens[:, i], new_ctx, need_distn=False) # Process each
+            new_ctx = self.forward(token = tokens[:, i], context = new_ctx, need_distn=False) # Process each
             ctx[:, i] = new_ctx
         return ctx
 
 if __name__ == "__main__":
-    t.set_default_device(t.device("cpu"))
+    t.set_default_device(t.device("cuda"))
     t.manual_seed(42)
     random.seed(42)
 

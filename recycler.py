@@ -77,8 +77,8 @@ if __name__ == "__main__":
     t.manual_seed(42)
     random.seed(42)
 
-    model_cfg = RecycleModelConfig(d_model=32, seq_len=128, d_mlp=128, d_head=16, n_heads=2, n_layers=4, recycle_layer=3, d_vocab=50257)
-    #model_cfg = RecycleModelConfig(d_model=512, seq_len=256, d_mlp=2048, d_head=64, n_heads=8, n_layers=4, d_vocab=50257)
+    model_cfg = RecycleModelConfig(d_model=32, seq_len=128, d_mlp=128, d_head=16, n_heads=2, n_layers=4, recycle_layer=2, d_vocab=50257)
+    #model_cfg = RecycleModelConfig(d_model=512, seq_len=128, d_mlp=2048, d_head=64, n_heads=8, n_layers=12, recycle_layer=10, d_vocab=50257)
     model = Recycler(model_cfg)
     training_cfg = TrainingConfig(
         batch_size=64,
